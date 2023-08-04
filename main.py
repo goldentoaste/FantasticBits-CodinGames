@@ -47,11 +47,11 @@ class V2:
 
 
 class Entity:
-    def __init__(self, name: str, pos: V2, vel: V2):
-        self.name = name
+    def __init__(self, eid: str, pos: V2, vel: V2):
+        self.id = eid
         self.pos = pos
         self.vel = vel
-
+        
     @property
     def x(self):
         return self.pos.x
@@ -70,7 +70,14 @@ class Entity:
 
 
     def __str__(self):
-        return f"Entity({self.name}), pos:{self.pos}, vel: {self.vel}"
+        return f"Entity({self.id}), pos:{self.pos}, vel: {self.vel}"
+    
+    def currentHeading(self)->V2:
+        '''
+        returns the position this object will end up at assuming no velocity changes
+        '''
+        
+        return self.pos + self.vel
     
     def calcInterceptCourse(self, target: 'Entity', maxThrust : int):
 
@@ -79,15 +86,19 @@ class Entity:
         maxThrust: the *max* magnitude this obj can accelerate by in 1 turn.
         
         returns the expected point of interception and max thrust needed to intercept.
-        at the moment always use the max thrust.
+        Use max thrust if interception not possible in 1 frame, 
+        but, if possible, calc the exact needed velocity change
         '''
         
         
         
         
+        return target.currentHeading(), maxThrust
         
         
-        pass
+        
+        
+        
     
 if __name__ == "__main__":
     SIDE = int(input())  # should be either left or right
