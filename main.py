@@ -173,7 +173,7 @@ class Sniffle(Entity):
         super().__init__(eid, pos, vel)
         self.type = "sniffle"
         self.grabbed = grabbed
-        self.targetted = False
+        self.targetted = None
 
     def update(self, pos: V2, vel: V2, grabbed=False):
         super().update(pos, vel)
@@ -204,9 +204,11 @@ class Wizard(Entity):
 
         minSniffle = sniffles[list(sniffles.keys())[0]]
         d = 999999
+        
+        print([s.targetted for s in sniffles.values()], file=sys.stderr)
         for s in sniffles.values():
             # TODO dont give up balls later
-            if s.grabbed or s.targetted:
+            if s.grabbed or s.targetted is not None:
                 continue
 
             dist = self.currentHeading().distTo(s.currentHeading())
@@ -216,12 +218,14 @@ class Wizard(Entity):
                 if s.targetted == self.id:
                     s.targetted = None
 
+        
         if minSniffle:
             minSniffle.targetted = self.id
-
+            print(f"minsniffle: {minSniffle.id} has been targetted by wizard #{self.id}",file=sys.stderr)
             direction, thrust = self.calcInterceptCourse(minSniffle, 150)
             print(f"MOVE {int(direction.x)} {int(direction.y)} {int(thrust)}")
             return
+
 
         # default behaviour
 
@@ -229,7 +233,7 @@ class Wizard(Entity):
 
 
 def updateCycle():
-    global allieScore, allieMagic, opponentScore, opponentMagic
+    global allieScore, allieMagic, opponentScore, opponentMagic, sniffles
 
     # just following thier template
     allieScore, allieMagic = [int(i) for i in input().split()]
@@ -237,6 +241,7 @@ def updateCycle():
 
     entityCount = int(input())  # number of ents
 
+    eids = set()
     for i in range(entityCount):
         # 1 entity per line
         vals = input().split()
@@ -247,6 +252,8 @@ def updateCycle():
         vel = V2(int(vals[4]), int(vals[5]))
         grabbed = bool(int(vals[6]))
 
+        eids.add(eid)
+        
         if etype == "WIZARD":
             try:
                 allies[eid].update(pos, vel, grabbed)
@@ -267,6 +274,9 @@ def updateCycle():
             except KeyError:
                 obj = Sniffle(eid, pos, vel, grabbed)
                 sniffles[eid] = obj
+                
+                
+    sniffles = {k:v for k,v in sniffles.items() if k in eids}
 
 
 if __name__ == "__main__":
