@@ -69,7 +69,7 @@ class V2:
     def __sub__(self, target: "V2") -> "V2":
         return self + (-1 * target)
 
-    def __div__(self, target: int) -> "V2":
+    def __truediv__(self, target: int) -> "V2":
         return self * (1 / target)
 
     def dot(self, target: "V2"):
@@ -92,6 +92,7 @@ class V2:
     @classmethod
     def avg(cls, vectors: List["V2"]) -> "V2":
         return sum(vectors, start=V2.ZERO()) / len(vectors)
+
 
 
 #### init ####
@@ -198,7 +199,7 @@ class Wizard(Entity):
         # logic for shooting
         if self.grabbed:
             goal = V2.avg(opponentGoal)
-            print(f"THROW {goal.x} {goal.y} 500")
+            print(f"THROW {int(goal.x)} {int(goal.y)} 500")
             return
 
         minSniffle = sniffles[list(sniffles.keys())[0]]
@@ -219,7 +220,7 @@ class Wizard(Entity):
             minSniffle.targetted = self.id
 
             direction, thrust = self.calcInterceptCourse(minSniffle, 150)
-            print(f"MOVE {direction.x} {direction.y} {thrust}")
+            print(f"MOVE {int(direction.x)} {int(direction.y)} {int(thrust)}")
             return
 
         # default behaviour
