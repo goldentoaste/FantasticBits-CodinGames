@@ -208,7 +208,7 @@ class Wizard(Entity):
         
         for s in sniffles.values():
             # TODO dont give up balls later
-            if s.grabbed or s.targetted is not None:
+            if s.grabbed or s.targetted != self.id:
                 continue
 
             dist = self.currentHeading().distTo(s.currentHeading())
