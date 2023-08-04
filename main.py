@@ -205,7 +205,7 @@ class Wizard(Entity):
         minSniffle = sniffles[list(sniffles.keys())[0]]
         d = 999999
         
-        print([s.targetted for s in sniffles.values()], file=sys.stderr)
+        
         for s in sniffles.values():
             # TODO dont give up balls later
             if s.grabbed or s.targetted is not None:
@@ -214,10 +214,11 @@ class Wizard(Entity):
             dist = self.currentHeading().distTo(s.currentHeading())
             if dist < d:
                 minSniffle = s
-            else:
-                if s.targetted == self.id:
-                    s.targetted = None
-
+                
+            if s.targetted == self.id:
+                s.targetted = None
+                    
+        print([s.targetted for s in sniffles.values()], file=sys.stderr)
         
         if minSniffle:
             minSniffle.targetted = self.id
