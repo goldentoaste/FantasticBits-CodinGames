@@ -145,10 +145,12 @@ class Entity:
 
         return self.pos + self.vel
 
-    def calcInterceptCourse(self, target: "Entity", maxThrust: int):
+    def calcChaseCourse(self, target: "Entity", maxThrust: int):
         """
         target: other entity this one will try to intercept.
         maxThrust: the *max* magnitude this obj can accelerate by in 1 turn.
+
+        Note this only accounts for 1 time step, should be used to gain marginal advantage in close range only
 
         returns the expected point of interception and max thrust needed to intercept.
         Use max thrust if interception not possible in 1 frame,
@@ -166,6 +168,36 @@ class Entity:
         thrust = min(maxThrust, error.mag())
 
         return target.currentHeading(), thrust
+
+    def calcInterceptCourse(self, target: "Entity", maxThrust: int):
+        """
+        target: other entity this one will try to intercept.
+        maxThrust: the *max* magnitude this obj can accelerate by in 1 turn.
+
+
+        Note: this is meant to calc intercept for longer distance.
+        The algo is simple and has errors, but should diminish as we approach target. 
+
+        returns the expected point of interception and max thrust needed to intercept.
+        Use max thrust if interception not possible in 1 frame,
+        but, if possible, calc the exact needed velocity change
+        """
+
+    
+
+        ### stack overflow /better version?
+        # https://gamedev.stackexchange.com/a/28312
+
+        # time it must for self to travel the straight line distance
+        distTime = target.pos.distTo(self.pos) / maxThrust
+
+        # where the target will be at after ^ time passed
+        targetHeading = target.pos + target.vel * distTime
+
+        # head to where target will be
+        return targetHeading, maxThrust
+        
+
 
 
 class Sniffle(Entity):
@@ -207,16 +239,19 @@ class Wizard(Entity):
         
         
         for s in sniffles.values():
+
+            if s.targetted == self.id:
+                s.targetted = None
             # TODO dont give up balls later
-            if s.grabbed or s.targetted != self.id:
+            if s.grabbed or s.targetted and s.targetted != self.id:
                 continue
 
             dist = self.currentHeading().distTo(s.currentHeading())
             if dist < d:
+                d = dist
                 minSniffle = s
                 
-            if s.targetted == self.id:
-                s.targetted = None
+            
                     
         print([s.targetted for s in sniffles.values()], file=sys.stderr)
         
