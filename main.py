@@ -7,7 +7,7 @@ LEFT = 0  # need to score right
 RIGHT = 1  # own goal is on right side, need to score left
 SIDE = LEFT  # to be init later in main
 
-
+NAVMODE_THRESHOLD = 1000
 # field/coords can be at most 16000 x 7500
 W = 16000
 H = 7500
@@ -138,6 +138,9 @@ class Entity:
     def __str__(self):
         return f"Entity({self.id}), pos:{self.pos}, vel: {self.vel}"
 
+    def distTo(self, target:'Entity'):
+        return self.pos.distTo(target.pos)
+
     def currentHeading(self) -> V2:
         """
         returns the position this object will end up at assuming no velocity changes
@@ -265,7 +268,25 @@ class Wizard(Entity):
 
         # default behaviour
 
-        print("MOVE 8000 3750 150")
+        
+
+def move(dest:V2, thrust):
+    print(f"MOVE {int(dest.x)} {int(dest.y)} {thrust}")
+
+
+def moveTowards(source: Entity, target: Entity):
+    dist = source.distTo(target)
+    
+    if dist < NAVMODE_THRESHOLD:
+        # better for close range encouters
+        dest,thrust = source.calcChaseCourse(target, 150)
+    else:
+        # this is more suitable for distant target
+        dest, thrust = source.calcInterceptCourse(target, 150)
+    
+    move(dest, thrust)
+
+
 
 
 def updateCycle():
