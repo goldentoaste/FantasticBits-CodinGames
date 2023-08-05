@@ -1,6 +1,6 @@
 import math
 import sys
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, List, Tuple, Literal, Union
 
 #### Consts ####
 
@@ -27,7 +27,7 @@ SNIFFLE_RAD = 150
 allies: Dict[int, "Wizard"] = {}
 opponents: Dict[int, "Wizard"] = {}
 sniffles: Dict[int, "Sniffle"] = {}
-bludgers = Dict[int, "Entity"] = {}
+bludgers : Dict[int, "Entity"] = {}
 
 gameTime = 0  # up to 200, in turns
 
@@ -58,7 +58,11 @@ class V2:
 
     @classmethod
     def ZERO(cls):
-        return V2(0, 0)
+        return cls(0, 0)
+    
+    @classmethod
+    def ONES(cls):
+        return cls(1,1)
 
     def __str__(self):
         return f"V2({self.x}, {self.y})"
@@ -77,6 +81,13 @@ class V2:
 
     def __truediv__(self, target: int) -> "V2":
         return self * (1 / target)
+    
+    def __getitem__(self, index:int):
+        if index == 0:
+            return self.x
+        if index == 1:
+            return self.y
+        raise IndexError("0 or 1 for to access")
 
     def dot(self, target: "V2"):
         """Dot product of this vector and another"""
@@ -98,6 +109,9 @@ class V2:
     @classmethod
     def avg(cls, vectors: List["V2"]) -> "V2":
         return sum(vectors, start=V2.ZERO()) / len(vectors)
+    
+    def peiceWiseMul(self, target: Union['V2', tuple]):
+        return V2(self.x * target[0], self.y * target[1])
 
 
 #### init ####
@@ -289,6 +303,8 @@ def line2dIntersec(l1 : Tuple[V2, V2], l2: Tuple[V2, V2]):
 def move(dest: V2, thrust):
     print(f"MOVE {int(dest.x)} {int(dest.y)} {thrust}")
 
+def throwing(target:V2):
+    print(f'THROW {int(target.x)} {int(target.y)} 500')
 
 def getCloesetSniffle(entity: Entity, sniffles: Dict[int, Sniffle], targeting = True):
     '''
@@ -330,19 +346,61 @@ def moveTowards(source: Entity, target: Entity):
         dest, thrust = source.calcInterceptCourse(target, 150)
 
     move(dest, thrust)
+    
+
+def playSpell(target : Entity, spell : Literal['dodge', 'freeze','pull', 'push']):
+    
+    spellNames = {
+        'dodge' : 'OBLIVIATE',
+        'freeze':'PETRIFICUS',
+        'pull': 'ACCIO',
+        'push':'FLIPENDO'
+    }
+    
+    print(f'{spellNames[spell]} {target.id}')
 
 
 def atkLogic(
     player : Wizard, sniffles: Dict[int, Sniffle], opponents: Dict[int, "Wizard"], bludgers: Dict[int, Entity]
 ):
+    
+    if player.grabbed:
+        return throwing(V2.avg(opponentGoal))
+    
     # TODO Avoid bludgers and other wizards
-
+    
+    topWall = (V2(0,0), V2(W, 0))
+    botWall = (V2(0, H), V2(W, H))
+    
+    
     closest : Sniffle = getCloesetSniffle(player, sniffles)
+    dist = player.distTo(closest)
     if not closest:
         return move(V2(8000, 3750), 150)
 
-    if mana > 25 and player.distTo(closest) < 1500:
+    if mana > 25 and  dist < 1500:
         course = (player.pos, (closest.pos - player.pos) * 10000) 
+        
+        intersect = line2dIntersec(course, opponentGoal)
+        
+        if not intersect:
+            wall = line2dIntersec(course, topWall) or line2dIntersec(course, botWall)
+            if wall:
+                reflected :V2 =  (closest.pos - player.pos + wall).peiceWiseMul(1, -1) * 10000
+                intersect = intersect or line2dIntersec((wall, reflected), opponentGoal)    
+
+        if intersect:
+            playSpell(closest, 'push')
+            return
+    
+    if mana > 20 and dist < 3000:
+        # if player is closer to goal than ball        
+        if abs(player.y - opponentGoal[0].x) < abs(closest.y - opponentGoal[0].x):
+            playSpell(closest, 'pull')
+            return
+    
+    return moveTowards(player, closest)
+
 
 
 
@@ -377,6 +435,11 @@ def makeMoves(
     else:
         def1 = allies[0]
         def2 = allies[1]
+        
+    
+    for item in (atk1, atk2, def1, def2):
+        if item:
+            atkLogic(item, sniffles, opponents, bludgers)
 
 
 
@@ -429,5 +492,4 @@ def updateCycle():
 if __name__ == "__main__":
     while True:
         updateCycle()
-        for w in allies.values():
-            w.play(allies[firstNot(w.id, allies)], sniffles, opponents)
+        makeMoves(allies, sniffles,opponents, bludgers)
