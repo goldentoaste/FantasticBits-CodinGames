@@ -25,9 +25,12 @@ SNIFFLE_RAD = 150
 
 
 allies: Dict[int, "Wizard"] = {}
+alliesList: List["Entity"] = []
 opponents: Dict[int, "Wizard"] = {}
 sniffles: Dict[int, "Sniffle"] = {}
-bludgers : Dict[int, "Entity"] = {}
+bludgers: Dict[int, "Entity"] = {}
+
+messageQueue: List[str] = []
 
 gameTime = 0  # up to 200, in turns
 
@@ -59,10 +62,10 @@ class V2:
     @classmethod
     def ZERO(cls):
         return cls(0, 0)
-    
+
     @classmethod
     def ONES(cls):
-        return cls(1,1)
+        return cls(1, 1)
 
     def __str__(self):
         return f"V2({self.x}, {self.y})"
@@ -81,8 +84,8 @@ class V2:
 
     def __truediv__(self, target: int) -> "V2":
         return self * (1 / target)
-    
-    def __getitem__(self, index:int):
+
+    def __getitem__(self, index: int):
         if index == 0:
             return self.x
         if index == 1:
@@ -109,8 +112,8 @@ class V2:
     @classmethod
     def avg(cls, vectors: List["V2"]) -> "V2":
         return sum(vectors, start=V2.ZERO()) / len(vectors)
-    
-    def peiceWiseMul(self, target: Union['V2', tuple]):
+
+    def peiceWiseMul(self, target: Union["V2", tuple]):
         return V2(self.x * target[0], self.y * target[1])
 
 
@@ -180,7 +183,7 @@ class Entity:
         """
 
         # err
-        targetPos = target.currentHeading()
+        targetPos = target.pos + target.vel * 5
 
         # error is much we need to correct by
         error = targetPos - self.pos - self.vel
@@ -198,7 +201,7 @@ class Entity:
 
 
         Note: this is meant to calc intercept for longer distance.
-        The algo is simple and has errors, but should diminish as we approach target. 
+        The algo is simple and has errors, but should diminish as we approach target.
 
         returns the expected point of interception and max thrust needed to intercept.
         Use max thrust if interception not possible in 1 frame,
@@ -241,7 +244,10 @@ class Wizard(Entity):
         self.grabbed = bool(grabbed)
 
     def play(
-        self, allie: "Wizard", sniffles: Dict[int, Sniffle], opponents: Dict[int, "Wizard"],
+        self,
+        allie: "Wizard",
+        sniffles: Dict[int, Sniffle],
+        opponents: Dict[int, "Wizard"],
     ):
         # logic for shooting
         if self.grabbed:
@@ -253,7 +259,6 @@ class Wizard(Entity):
         d = 999999
 
         for s in sniffles.values():
-
             if s.targetted == self.id:
                 s.targetted = None
             # TODO dont give up balls later
@@ -269,7 +274,10 @@ class Wizard(Entity):
 
         if minSniffle:
             minSniffle.targetted = self.id
-            print(f"minsniffle: {minSniffle.id} has been targetted by wizard #{self.id}", file=sys.stderr)
+            print(
+                f"minsniffle: {minSniffle.id} has been targetted by wizard #{self.id}",
+                file=sys.stderr,
+            )
             direction, thrust = self.calcInterceptCourse(minSniffle, 150)
             print(f"MOVE {int(direction.x)} {int(direction.y)} {int(thrust)}")
             return
@@ -277,22 +285,21 @@ class Wizard(Entity):
         # default behaviour
 
 
-def line2dIntersec(l1 : Tuple[V2, V2], l2: Tuple[V2, V2]):
-
+def line2dIntersec(l1: Tuple[V2, V2], l2: Tuple[V2, V2]):
     diff1 = l1[0] - l1[1]
     diff2 = l2[0] - l2[1]
-    
+
     dx = V2(diff1.x, diff2.x)
     dy = V2(diff1.y, diff2.y)
 
     def det(a: V2, b: V2):
         return a.x * b.y - a.y * b.x
-    
+
     div = det(dx, dy)
-    
-    if div==0:
+
+    if div == 0:
         return None
-    
+
     d = V2(det(*l1), det(*l2))
     x = det(d, dx) / div
     y = det(d, dy) / div
@@ -301,28 +308,29 @@ def line2dIntersec(l1 : Tuple[V2, V2], l2: Tuple[V2, V2]):
 
 
 def move(dest: V2, thrust):
-    print(f"MOVE {int(dest.x)} {int(dest.y)} {thrust}")
+    print(f"MOVE {int(dest.x)} {int(dest.y)} {int(thrust)}")
 
-def throwing(target:V2):
-    print(f'THROW {int(target.x)} {int(target.y)} 500')
 
-def getCloesetSniffle(entity: Entity, sniffles: Dict[int, Sniffle], targeting = True):
-    '''
+def throwing(target: V2):
+    print(f"THROW {int(target.x)} {int(target.y)} 500")
+
+
+def getCloesetSniffle(entity: Entity, sniffles: Dict[int, Sniffle], targeting=True):
+    """
     If targetting, mark the closest as targetted
-    '''
-    
+    """
+
     minSniffle = None
     minD = 9999
     for s in sniffles.values():
-
         if targeting and s.targetted == entity.id:
             s.targetted = False
-        
+
         if targeting and (s.grabbed or s.targetted and s.targetted != entity.id):
             continue
 
-        dist = entity.currentHeading().distTo(s.currentHeading()) - WIZARD_RAD - SNIFFLE_RAD
-        
+        dist = entity.currentHeading().distTo(s.currentHeading())
+
         if dist < minD:
             minD = dist
             minSniffle = s
@@ -333,82 +341,152 @@ def getCloesetSniffle(entity: Entity, sniffles: Dict[int, Sniffle], targeting = 
             return minSniffle
         return minSniffle
 
-    return sniffles[next(sniffles.keys())]
+    return sniffles[next(iter(sniffles.keys()))]
+
+
+def getDefense(entity: Entity, sniffles: Dict[int, Sniffle], targeting=True):
+    """
+    If targetting, mark the closest as targetted
+    """
+
+    minSniffle = None
+    minD = 9999
+    for s in sniffles.values():
+        if targeting and s.targetted == entity.id:
+            s.targetted = False
+
+        if targeting and (s.grabbed or s.targetted and s.targetted != entity.id):
+            continue
+
+        dist = abs(s.x - allieGoal[0].x)
+
+        if dist < minD:
+            minD = dist
+            minSniffle = s
+
+    if minSniffle:
+        if targeting:
+            minSniffle.targetted = entity.id
+            return minSniffle
+        return minSniffle
+
+    return sniffles[next(iter(sniffles.keys()))]
+
 
 def moveTowards(source: Entity, target: Entity):
-    dist = source.distTo(target) - WIZARD_RAD - SNIFFLE_RAD
-
-    if dist < NAVMODE_THRESHOLD:
-        # better for close range encouters
-        dest, thrust = source.calcChaseCourse(target, 150)
-    else:
-        # this is more suitable for distant target
-        dest, thrust = source.calcInterceptCourse(target, 150)
+    # dist = source.distTo(target) - WIZARD_RAD - SNIFFLE_RAD
+    dest, thrust = source.calcChaseCourse(target, 150)
+    # if dist < NAVMODE_THRESHOLD:
+    #     # better for close range encouters
+    #     dest, thrust = source.calcChaseCourse(target, 150)
+    # else:
+    #     # this is more suitable for distant target
+    #     dest, thrust = source.calcInterceptCourse(target, 150)
 
     move(dest, thrust)
-    
 
-def playSpell(target : Entity, spell : Literal['dodge', 'freeze','pull', 'push']):
-    
+
+def playSpell(
+    target: Entity, spell: Literal["dodge", "freeze", "pull", "push"], msg: str = ""
+):
     spellNames = {
-        'dodge' : 'OBLIVIATE',
-        'freeze':'PETRIFICUS',
-        'pull': 'ACCIO',
-        'push':'FLIPENDO'
+        "dodge": "OBLIVIATE",
+        "freeze": "PETRIFICUS",
+        "pull": "ACCIO",
+        "push": "FLIPENDO",
     }
-    
-    print(f'{spellNames[spell]} {target.id}')
+    if msg:
+        msg = " " + msg
+    print(f"{spellNames[spell]} {target.id}{msg}")
 
 
 def atkLogic(
-    player : Wizard, sniffles: Dict[int, Sniffle], opponents: Dict[int, "Wizard"], bludgers: Dict[int, Entity]
+    player: Wizard,
+    sniffles: Dict[int, Sniffle],
+    opponents: Dict[int, "Wizard"],
+    bludgers: Dict[int, Entity],
 ):
-    
     if player.grabbed:
         return throwing(V2.avg(opponentGoal))
-    
+
     # TODO Avoid bludgers and other wizards
-    
-    topWall = (V2(0,0), V2(W, 0))
+
+    topWall = (V2(0, 0), V2(W, 0))
     botWall = (V2(0, H), V2(W, H))
-    
-    
-    closest : Sniffle = getCloesetSniffle(player, sniffles)
+
+    closest: Sniffle = getCloesetSniffle(player, sniffles)
     dist = player.distTo(closest)
     if not closest:
         return move(V2(8000, 3750), 150)
 
-    if mana > 25 and  dist < 1500:
-        course = (player.pos, (closest.pos - player.pos) * 10000) 
-        
+    if mana > 25 and dist < 2000:
+        course = (player.pos, (closest.pos - player.pos) + V2(12000, 12000))
+
         intersect = line2dIntersec(course, opponentGoal)
-        
+        print(
+            f"course: {course[0]}, {course[1]}, intersect: {intersect}", file=sys.stderr
+        )
+
         if not intersect:
             wall = line2dIntersec(course, topWall) or line2dIntersec(course, botWall)
             if wall:
-                reflected :V2 =  (closest.pos - player.pos + wall).peiceWiseMul(1, -1) * 10000
-                intersect = intersect or line2dIntersec((wall, reflected), opponentGoal)    
+                reflected: V2 = (closest.pos - player.pos + wall).peiceWiseMul(
+                    1, -1
+                ) * 10000
+                intersect = intersect or line2dIntersec((wall, reflected), opponentGoal)
 
         if intersect:
-            playSpell(closest, 'push')
+            playSpell(closest, "push", msg=f"{intersect}")
             return
-    
-    if mana > 20 and dist < 3000:
-        # if player is closer to goal than ball        
-        if abs(player.y - opponentGoal[0].x) < abs(closest.y - opponentGoal[0].x):
-            playSpell(closest, 'pull')
+
+    if mana > 15 and dist < 3000 and dist > 1000:
+        # if player is closer to goal than ball
+        if abs(player.x - opponentGoal[0].x) < abs(closest.x - opponentGoal[0].x):
+            playSpell(closest, "pull")
             return
-    
+
     return moveTowards(player, closest)
 
 
+def degLogic(
+    player: Wizard,
+    ally: Wizard,
+    sniffles: Dict[int, Sniffle],
+    opponents: Dict[int, "Wizard"],
+    bludgers: Dict[int, Entity],
+):
+    if player.grabbed:
+        if abs(ally.x - opponentGoal[0].x) < W / 2:
+            return throwing(ally.pos)
+        else:
+            return throwing(V2.avg(opponentGoal))
 
+    if mana > 15:
+        for s in sniffles:
+            p = s.pos + s.vel * 5
+            if (SIDE == 0 and p.x >= W) or (SIDE == 1 and p.x <= 0):
+                return playSpell(s, ["freeze"])
+
+    mostLeft = getDefense(player, sniffles)
+
+    if mostLeft:
+        if abs(mostLeft.x - allieGoal[0].x) < abs(player.x - allieGoal[0].x):
+            if mana > 20:
+                return playSpell(mostLeft, "pull")
+
+            return moveTowards(player, mostLeft)
+
+    if SIDE == LEFT:
+        return move(V2.avg(allieGoal) - V2(2000, 0), 150)
+    return move(V2.avg(allieGoal) + V2(2000, 0), 150)
 
 
 def makeMoves(
-    allie: "Wizard", sniffles: Dict[int, Sniffle], opponents: Dict[int, "Wizard"], bludgers: Dict[int, Entity]
+    allie: "Wizard",
+    sniffles: Dict[int, Sniffle],
+    opponents: Dict[int, "Wizard"],
+    bludgers: Dict[int, Entity],
 ):
-
     atk1 = None
     atk2 = None
 
@@ -417,34 +495,39 @@ def makeMoves(
 
     # new strat, depending on where sniffles are, chose number of attackers and defenders
 
-
     # assume side is left, count balls
     ballsInOurSide = 0
     for s in sniffles.values():
-        if s.x > W/2:
+        if s.x > W / 2:
             ballsInOurSide += 1
     if SIDE == RIGHT:
-        ballsInOurSide = len(sniffles) - ballsInOurSide 
-    
-    if ballsInOurSide == 0:
-        atk1 = allies[0]
-        atk2 = allies[1]
-    elif ballsInOurSide < len(sniffles) // 2:
-        atk1 = allie[0]
-        def1 = allies[1]
-    else:
-        def1 = allies[0]
-        def2 = allies[1]
-        
-    
-    for item in (atk1, atk2, def1, def2):
-        if item:
-            atkLogic(item, sniffles, opponents, bludgers)
+        ballsInOurSide = len(sniffles) - ballsInOurSide
 
+    if ballsInOurSide == 0:
+        atk1 = alliesList[0]
+        atk2 = alliesList[1]
+    elif ballsInOurSide < len(sniffles) // 2:
+        atk1 = alliesList[0]
+        def1 = alliesList[1]
+    else:
+        def1 = alliesList[0]
+        def2 = alliesList[1]
+
+    if atk1:
+        atkLogic(atk1, sniffles, opponents, bludgers)
+
+    if atk2:
+        atkLogic(atk2, sniffles, opponents, bludgers)
+
+    if def1:
+        degLogic(def1, atk1 if atk1 else def2, sniffles, opponents, bludgers)
+
+    if def2:
+        degLogic(def2, def1, sniffles, opponents, bludgers)
 
 
 def updateCycle():
-    global allieScore, mana, opponentScore, opponentMagic, sniffles
+    global allieScore, mana, opponentScore, opponentMagic, sniffles, alliesList
 
     # just following thier template
     allieScore, mana = [int(i) for i in input().split()]
@@ -453,6 +536,7 @@ def updateCycle():
     entityCount = int(input())  # number of ents
 
     eids = set()
+
     for i in range(entityCount):
         # 1 entity per line
         vals = input().split()
@@ -487,9 +571,10 @@ def updateCycle():
                 sniffles[eid] = obj
 
     sniffles = {k: v for k, v in sniffles.items() if k in eids}
+    alliesList = list(allies.values())
 
 
 if __name__ == "__main__":
     while True:
         updateCycle()
-        makeMoves(allies, sniffles,opponents, bludgers)
+        makeMoves(allies, sniffles, opponents, bludgers)
