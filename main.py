@@ -307,8 +307,10 @@ def line2dIntersec(l1: Tuple[V2, V2], l2: Tuple[V2, V2]):
     return V2(x, y)
 
 
-def move(dest: V2, thrust):
-    print(f"MOVE {int(dest.x)} {int(dest.y)} {int(thrust)}")
+def move(dest: V2, thrust:int, msg:str = ""):
+    if msg:
+        msg = " " + msg
+    print(f"MOVE {int(dest.x)} {int(dest.y)} {int(thrust)}{msg}")
 
 
 def throwing(target: V2):
@@ -358,7 +360,7 @@ def getDefense(entity: Entity, sniffles: Dict[int, Sniffle], targeting=True):
         if targeting and (s.grabbed or s.targetted and s.targetted != entity.id):
             continue
 
-        dist = abs(s.x - allieGoal[0].x)
+        dist = V2.avg(allieGoal).distTo(s.currentHeading())
 
         if dist < minD:
             minD = dist
@@ -461,24 +463,24 @@ def degLogic(
         else:
             return throwing(V2.avg(opponentGoal))
 
-    if mana > 15:
-        for s in sniffles:
+    if mana > 10:
+        for s in sniffles.values():
             p = s.pos + s.vel * 5
-            if (SIDE == 0 and p.x >= W) or (SIDE == 1 and p.x <= 0):
-                return playSpell(s, ["freeze"])
+            if (SIDE == RIGHT and p.x >= W) or (SIDE == LEFT and p.x <= 0):
+                return playSpell(s, "freeze")
 
     mostLeft = getDefense(player, sniffles)
 
     if mostLeft:
         if abs(mostLeft.x - allieGoal[0].x) < abs(player.x - allieGoal[0].x):
-            if mana > 20:
+            if mana > 15:
                 return playSpell(mostLeft, "pull")
 
-            return moveTowards(player, mostLeft)
+        return moveTowards(player, mostLeft)
 
     if SIDE == LEFT:
-        return move(V2.avg(allieGoal) - V2(2000, 0), 150)
-    return move(V2.avg(allieGoal) + V2(2000, 0), 150)
+        return move(V2.avg(allieGoal) + V2(2000, 0), 150,f"{V2.avg(allieGoal) + V2(2000, 0)}")
+    return move(V2.avg(allieGoal) - V2(2000, 0), 150,f"{V2.avg(allieGoal) - V2(2000, 0)}")
 
 
 def makeMoves(
@@ -502,16 +504,16 @@ def makeMoves(
             ballsInOurSide += 1
     if SIDE == RIGHT:
         ballsInOurSide = len(sniffles) - ballsInOurSide
-
+    print(f"ball in our side {ballsInOurSide}", file=sys.stderr)
     if ballsInOurSide == 0:
         atk1 = alliesList[0]
         atk2 = alliesList[1]
-    elif ballsInOurSide < len(sniffles) // 2:
+    else:
         atk1 = alliesList[0]
         def1 = alliesList[1]
-    else:
-        def1 = alliesList[0]
-        def2 = alliesList[1]
+    # else:
+    #     def1 = alliesList[0]
+    #     def2 = alliesList[1]
 
     if atk1:
         atkLogic(atk1, sniffles, opponents, bludgers)
@@ -522,8 +524,8 @@ def makeMoves(
     if def1:
         degLogic(def1, atk1 if atk1 else def2, sniffles, opponents, bludgers)
 
-    if def2:
-        degLogic(def2, def1, sniffles, opponents, bludgers)
+    # if def2:
+    #     degLogic(def2, def1, sniffles, opponents, bludgers)
 
 
 def updateCycle():
