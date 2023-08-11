@@ -5,4 +5,4 @@
  
 
 ### Current Ranking: 
-Wood 2 :skull:
+Gold 🏅
