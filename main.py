@@ -109,7 +109,7 @@ class V2:
     def distTo(self, target: "V2"):
         return (target - self).mag()
 
-    @classmethod
+    @classmetho d
     def avg(cls, vectors: List["V2"]) -> "V2":
         return sum(vectors, start=V2.ZERO()) / len(vectors)
 
